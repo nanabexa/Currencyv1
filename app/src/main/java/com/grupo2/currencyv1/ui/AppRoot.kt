@@ -13,42 +13,55 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.grupo2.currencyv1.ui.budget.BudgetRoute
 import com.grupo2.currencyv1.ui.expenses.ExpensesRoute
+import com.grupo2.currencyv1.ui.home.HomeRoute
 import com.grupo2.currencyv1.ui.incomes.IncomesRoute
 
+private const val TAB_HOME = 0
+private const val TAB_INCOMES = 1
+private const val TAB_EXPENSES = 2
+private const val TAB_BUDGET = 3
+
 /**
- * Raíz de la app: barra inferior con las secciones. Las pestañas de la v1 se cambian con un
- * estado simple (sin librería de navegación). Principal, Presupuesto e Historial se agregan
- * en las iteraciones 5 a 7.
+ * Raíz de la app: barra inferior con las secciones, cambiadas con un estado simple.
+ * El historial (iteración 7) se agrega como una pestaña más.
  */
 @Composable
 fun AppRoot() {
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    var tab by rememberSaveable { mutableIntStateOf(TAB_HOME) }
 
     // Cada pantalla trae su propia barra superior, que ya maneja el espacio de la barra de estado.
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             NavigationBar {
-                NavigationBarItem(
-                    selected = tab == 0,
-                    onClick = { tab = 0 },
-                    icon = {},
-                    label = { Text("Ingresos") }
+                val items = listOf(
+                    TAB_HOME to "Principal",
+                    TAB_INCOMES to "Ingresos",
+                    TAB_EXPENSES to "Gastos",
+                    TAB_BUDGET to "Presupuesto"
                 )
-                NavigationBarItem(
-                    selected = tab == 1,
-                    onClick = { tab = 1 },
-                    icon = {},
-                    label = { Text("Gastos") }
-                )
+                items.forEach { (index, label) ->
+                    NavigationBarItem(
+                        selected = tab == index,
+                        onClick = { tab = index },
+                        icon = {},
+                        label = { Text(label) }
+                    )
+                }
             }
         }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
             when (tab) {
-                0 -> IncomesRoute()
-                else -> ExpensesRoute()
+                TAB_HOME -> HomeRoute(
+                    onGoToIncomes = { tab = TAB_INCOMES },
+                    onGoToBudget = { tab = TAB_BUDGET }
+                )
+                TAB_INCOMES -> IncomesRoute()
+                TAB_EXPENSES -> ExpensesRoute()
+                else -> BudgetRoute()
             }
         }
     }

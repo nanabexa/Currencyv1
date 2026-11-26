@@ -65,6 +65,14 @@ interface IngresoDao {
            WHERE tipo = 'EXTRA' AND fecha BETWEEN :desde AND :hasta"""
     )
     fun observeTotalExtras(desde: LocalDate, hasta: LocalDate): Flow<Long>
+
+    /** Total de extras entre dos fechas, en centavos (version de una sola lectura, para cerrar periodos). */
+    @Query(
+        """SELECT COALESCE(SUM(montoCentavos), 0) FROM ingresos
+           WHERE tipo = 'EXTRA' AND fecha BETWEEN :desde AND :hasta"""
+    )
+    suspend fun totalExtras(desde: LocalDate, hasta: LocalDate): Long
+
 }
 
 @Dao
@@ -135,6 +143,13 @@ interface GastoDao {
 
     @Query("SELECT COUNT(*) FROM gastos")
     fun observeCount(): Flow<Int>
+
+    /** Total de gastos variables entre dos fechas, en centavos (version de una sola lectura). */
+    @Query(
+        """SELECT COALESCE(SUM(montoCentavos), 0) FROM gastos
+           WHERE tipo = 'VARIABLE' AND fecha BETWEEN :desde AND :hasta"""
+    )
+    suspend fun totalVariables(desde: LocalDate, hasta: LocalDate): Long
 }
 
 @Dao

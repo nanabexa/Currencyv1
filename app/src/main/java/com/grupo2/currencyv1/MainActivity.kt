@@ -21,13 +21,16 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Cada vez que la app vuelve a primer plano se aplican los descuentos de gastos fijos que ya
-     * llegaron (incluidos los atrasados si el teléfono estaba apagado). La iteración 8 lo
-     * complementa con WorkManager para que ocurra también en segundo plano.
+     * Cada vez que la app vuelve a primer plano: primero se aplican los descuentos de gastos fijos
+     * que ya llegaron y después se cierran los periodos terminados (el sobrante pasa al ahorro).
+     * La iteración 8 lo complementa con WorkManager para que ocurra también en segundo plano.
      */
     override fun onStart() {
         super.onStart()
         val container = (application as CurrencyApplication).container
-        lifecycleScope.launch { container.expenseRepository.processPending() }
+        lifecycleScope.launch {
+            container.expenseRepository.processPending()
+            container.budgetRepository.closeElapsedPeriods()
+        }
     }
 }

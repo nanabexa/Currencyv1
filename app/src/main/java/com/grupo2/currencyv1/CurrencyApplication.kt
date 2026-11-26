@@ -3,6 +3,7 @@ package com.grupo2.currencyv1
 import android.app.Application
 import android.content.Context
 import com.grupo2.currencyv1.data.AppDatabase
+import com.grupo2.currencyv1.data.BudgetRepository
 import com.grupo2.currencyv1.data.ExpenseRepository
 import com.grupo2.currencyv1.data.IncomeRepository
 import java.time.Clock
@@ -19,6 +20,14 @@ class AppContainer(context: Context) {
 
     val expenseRepository = ExpenseRepository(
         categoriaDao = database.categoriaDao(),
+        ingresoDao = database.ingresoDao(),
+        gastoFijoDao = database.gastoFijoDao(),
+        gastoDao = database.gastoDao(),
+        presupuestoDao = database.presupuestoDao(),
+        clock = clock
+    )
+
+    val budgetRepository = BudgetRepository(
         ingresoDao = database.ingresoDao(),
         gastoFijoDao = database.gastoFijoDao(),
         gastoDao = database.gastoDao(),

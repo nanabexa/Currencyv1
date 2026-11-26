@@ -4,14 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.lifecycleScope
+import com.grupo2.currencyv1.ui.AppRoot
 import com.grupo2.currencyv1.ui.theme.CurrencyV1Theme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,29 +15,19 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             CurrencyV1Theme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                AppRoot()
             }
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    CurrencyV1Theme {
-        Greeting("Android")
+    /**
+     * Cada vez que la app vuelve a primer plano se aplican los descuentos de gastos fijos que ya
+     * llegaron (incluidos los atrasados si el teléfono estaba apagado). La iteración 8 lo
+     * complementa con WorkManager para que ocurra también en segundo plano.
+     */
+    override fun onStart() {
+        super.onStart()
+        val container = (application as CurrencyApplication).container
+        lifecycleScope.launch { container.expenseRepository.processPending() }
     }
 }

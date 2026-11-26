@@ -78,6 +78,9 @@ interface GastoFijoDao {
     @Query("SELECT * FROM gastos_fijos WHERE id = :id")
     suspend fun getById(id: Long): GastoFijoEntity?
 
+    @Query("SELECT * FROM gastos_fijos ORDER BY id")
+    suspend fun getAll(): List<GastoFijoEntity>
+
     @Query(
         """SELECT * FROM gastos_fijos
            WHERE vigenteDesde <= :fecha AND (vigenteHasta IS NULL OR vigenteHasta >= :fecha)

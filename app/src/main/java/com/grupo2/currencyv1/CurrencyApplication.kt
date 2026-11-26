@@ -16,7 +16,12 @@ class AppContainer(context: Context) {
     val database: AppDatabase = AppDatabase.create(context)
     val clock: Clock = Clock.systemDefaultZone()
 
-    val incomeRepository = IncomeRepository(database.ingresoDao(), clock)
+    val incomeRepository = IncomeRepository(
+        dao = database.ingresoDao(),
+        gastoFijoDao = database.gastoFijoDao(),
+        presupuestoDao = database.presupuestoDao(),
+        clock = clock
+    )
 
     val expenseRepository = ExpenseRepository(
         categoriaDao = database.categoriaDao(),

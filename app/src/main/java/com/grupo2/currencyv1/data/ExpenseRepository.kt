@@ -35,7 +35,7 @@ class ExpenseRepository(
     private val presupuestoDao: PresupuestoDao,
     private val clock: Clock
 ) {
-    private fun today(): LocalDate = LocalDate.now(clock)
+    fun today(): LocalDate = LocalDate.now(clock)
 
     fun observeCategories(): Flow<List<CategoriaEntity>> = categoriaDao.observeAll()
 
@@ -135,4 +135,83 @@ class ExpenseRepository(
         }
         return applied
     }
+
+    // ---------------- CU-08: modificar y eliminar ----------------
+
+    /** Gasto variable: el cambio se aplica de inmediato. */
+    suspend fun updateVariable(id: Long, draft: VariableExpenseDraft): ChangeResult {
+        val gasto = gastoDao.getById(id)?.takeIf { it.tipo == ExpenseType.VARIABLE }
+            ?: return ChangeResult.Rejected(ChangeRejection.NOT_FOUND)
+        gastoDao.update(gasto.copy(categoriaId = draft.categoryId, montoCentavos = draft.amount.centavos))
+        return ChangeResult.Saved
+    }
+
+    suspend fun deleteVariable(id: Long): ChangeResult {
+        val gasto = gastoDao.getById(id)?.takeIf { it.tipo == ExpenseType.VARIABLE }
+            ?: return ChangeResult.Rejected(ChangeRejection.NOT_FOUND)
+        gastoDao.delete(gasto)
+        return ChangeResult.Saved
+    }
+
+    /**
+     * Gasto fijo: el cambio rige desde [effectiveFrom] (RC-10). La regla actual se cierra el día
+     * anterior y se crea otra con los datos nuevos, así los descuentos ya aplicados se conservan.
+     */
+    suspend fun updateFixed(ruleId: Long, draft: FixedExpenseDraft, effectiveFrom: LocalDate): ChangeResult {
+        val rule = gastoFijoDao.getById(ruleId) ?: return ChangeResult.Rejected(ChangeRejection.NOT_FOUND)
+        if (rule.vigenteHasta != null) return ChangeResult.Rejected(ChangeRejection.CHANGE_ALREADY_SCHEDULED)
+
+        val hoy = today()
+        val salaries = ingresoDao.getSalariosVigentes(hoy)
+        val period = salaries.firstOrNull()?.periodo
+            ?: return ChangeResult.Rejected(ChangeRejection.NOT_FOUND)
+
+        // CU-02, excepción 7h: fijos (sin contar esta regla) + el nuevo monto + ahorro <= salario.
+        val salarioTotal = salaries.fold(Money.ZERO) { total, s -> total + Money(s.montoCentavos) }
+        val fijosOtros = totalFixedExpenses(
+            gastoFijoDao.getVigentes(hoy)
+                .filter { it.id != ruleId }
+                .map { FixedExpenseAmount(Money(it.montoCentavos), it.frecuencia) },
+            period
+        )
+        val ahorro = presupuestoDao.get()
+            ?.let { amountOfPercent(salarioTotal, Percent(it.ahorroCentesimas)) }
+            ?: Money.ZERO
+        val nuevo = normalizeToPeriod(draft.amount, draft.frequency, period)
+        val disponible = remainingForFixed(salarioTotal, fijosOtros, ahorro)
+        if (nuevo > disponible) {
+            return ChangeResult.Rejected(ChangeRejection.FIXED_EXCEEDS_SALARY, maxFixed = disponible)
+        }
+
+        val start = replacementStart(rule, effectiveFrom)
+        gastoFijoDao.update(rule.copy(vigenteHasta = start.minusDays(1)))
+        gastoFijoDao.insert(
+            GastoFijoEntity(
+                categoriaId = draft.categoryId,
+                montoCentavos = draft.amount.centavos,
+                frecuencia = draft.frequency,
+                diasDescuento = draft.payDays,
+                vigenteDesde = start
+            )
+        )
+        processPending()
+        return ChangeResult.Saved
+    }
+
+    /** Eliminar un gasto fijo: deja de aplicarse desde [effectiveFrom]; el historial se conserva. */
+    suspend fun deleteFixed(ruleId: Long, effectiveFrom: LocalDate): ChangeResult {
+        val rule = gastoFijoDao.getById(ruleId) ?: return ChangeResult.Rejected(ChangeRejection.NOT_FOUND)
+        if (rule.vigenteHasta != null) return ChangeResult.Rejected(ChangeRejection.CHANGE_ALREADY_SCHEDULED)
+
+        val start = replacementStart(rule, effectiveFrom)
+        gastoFijoDao.update(rule.copy(vigenteHasta = start.minusDays(1)))
+        return ChangeResult.Saved
+    }
+
+    /**
+     * Si la regla ya descontó en la fecha de vigencia (solo puede pasar si es hoy), ese descuento
+     * se conserva con el monto anterior y el cambio empieza al día siguiente.
+     */
+    private suspend fun replacementStart(rule: GastoFijoEntity, effectiveFrom: LocalDate): LocalDate =
+        if (gastoDao.countAppliedOn(rule.id, effectiveFrom) > 0) effectiveFrom.plusDays(1) else effectiveFrom
 }

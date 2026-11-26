@@ -150,6 +150,11 @@ interface GastoDao {
            WHERE tipo = 'VARIABLE' AND fecha BETWEEN :desde AND :hasta"""
     )
     suspend fun totalVariables(desde: LocalDate, hasta: LocalDate): Long
+
+    /** Cuantos descuentos de una regla de gasto fijo ya se aplicaron en una fecha (0 o 1 normalmente). */
+    @Query("SELECT COUNT(*) FROM gastos WHERE gastoFijoId = :reglaId AND fecha = :fecha")
+    suspend fun countAppliedOn(reglaId: Long, fecha: LocalDate): Int
+
 }
 
 @Dao

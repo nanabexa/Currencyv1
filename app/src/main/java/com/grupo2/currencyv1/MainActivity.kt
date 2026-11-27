@@ -4,7 +4,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.grupo2.currencyv1.ui.AppRoot
 import com.grupo2.currencyv1.ui.theme.CurrencyV1Theme
 import kotlinx.coroutines.launch
@@ -18,19 +20,17 @@ class MainActivity : ComponentActivity() {
                 AppRoot()
             }
         }
-    }
 
-    /**
-     * Cada vez que la app vuelve a primer plano: primero se aplican los descuentos de gastos fijos
-     * que ya llegaron y después se cierran los periodos terminados (el sobrante pasa al ahorro).
-     * La iteración 8 lo complementa con WorkManager para que ocurra también en segundo plano.
-     */
-    override fun onStart() {
-        super.onStart()
         val container = (application as CurrencyApplication).container
         lifecycleScope.launch {
-            container.expenseRepository.processPending()
-            container.budgetRepository.closeElapsedPeriods()
+            // Este bloque se ejecuta cada vez que la app vuelve a primer plano (y se cancela al salir).
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                // 1) Descuentos de gastos fijos pendientes y cierre de periodos.
+                container.runPeriodicChecks()
+                // 2) Mientras la app esté visible, cada cambio del resumen se revisa para avisar
+                //    (presupuesto bajo, excedente).
+                container.budgetRepository.observeOverview().collect { container.alertEngine.evaluate(it) }
+            }
         }
     }
 }

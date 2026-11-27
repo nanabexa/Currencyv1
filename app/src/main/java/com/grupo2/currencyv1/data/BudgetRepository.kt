@@ -16,7 +16,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import java.time.Clock
 import java.time.LocalDate
 
@@ -35,7 +37,15 @@ sealed interface SaveBudgetResult {
     data class Rejected(val reason: BudgetError, val maxAhorro: Percent?) : SaveBudgetResult
 }
 
-/** Presupuesto (CU-04), resumen del periodo (CU-10) y cierre de periodos (RC-09). */
+sealed interface SaveLimitResult {
+    data object Saved : SaveLimitResult
+    data object NoBudget : SaveLimitResult
+
+    /** CU-07, excepción 4f: el límite supera el presupuesto total ([max]). */
+    data class TooHigh(val max: Money) : SaveLimitResult
+}
+
+/** Presupuesto (CU-04), límite (CU-07), resumen del periodo (CU-10) y cierre de periodos (RC-09). */
 class BudgetRepository(
     private val ingresoDao: IngresoDao,
     private val gastoFijoDao: GastoFijoDao,
@@ -139,6 +149,25 @@ class BudgetRepository(
                 }
             }
         }
+    }
+
+    // ---------------- CU-07: límite ----------------
+
+    /** Límite configurado, o null si no hay. */
+    fun observeLimit(): Flow<Money?> =
+        presupuestoDao.observe().map { presupuesto -> presupuesto?.limiteCentavos?.let { Money(it) } }
+
+    /**
+     * Guarda el límite si no supera el presupuesto total (RN-02). Al guardar se vuelve a armar el aviso,
+     * así que si el disponible ya está por debajo del límite se notifica de inmediato (flujo 4a).
+     */
+    suspend fun saveLimit(limit: Money): SaveLimitResult {
+        val presupuesto = presupuestoDao.get() ?: return SaveLimitResult.NoBudget
+        val total = observeOverview().first()?.budget?.variables ?: return SaveLimitResult.NoBudget
+        if (limit > total) return SaveLimitResult.TooHigh(total)
+
+        presupuestoDao.save(presupuesto.copy(limiteCentavos = limit.centavos, limiteNotificado = false))
+        return SaveLimitResult.Saved
     }
 
     // ---------------- RC-09: cierre de periodos ----------------

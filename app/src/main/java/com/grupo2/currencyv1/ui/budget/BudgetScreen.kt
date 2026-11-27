@@ -82,7 +82,7 @@ fun BudgetScreen(viewModel: BudgetViewModel) {
                     item {
                         Text(
                             "Tus gastos fijos son iguales o mayores a tu salario. " +
-                                "Corrígelos en la pestaña Gastos para poder configurar el presupuesto.",
+                                    "Corrígelos en la pestaña Gastos para poder configurar el presupuesto.",
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodyMedium
                         )
@@ -134,6 +134,11 @@ fun BudgetScreen(viewModel: BudgetViewModel) {
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
+                }
+
+                // CU-07: el límite se configura desde la pantalla de presupuesto.
+                if (state.isConfigured && !state.fijosBlock) {
+                    item { LimitSection() }
                 }
             }
         }
